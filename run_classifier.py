@@ -625,9 +625,8 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
             return (loss, per_example_loss, logits, probabilities)
         else:
             msle = tf.losses.mean_squared_error(tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30)), tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30)))
-            loss = tf.reduce_mean(msle)
 
-            return (loss, tf.identity(msle), logits, loss)
+            return (msle, msle, logits, msle)
 
 
 def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
@@ -907,7 +906,7 @@ def main(_):
         num_train_steps=num_train_steps,
         num_warmup_steps=num_warmup_steps,
         use_tpu=FLAGS.use_tpu,
-        use_one_hot_embeddings=FLAGS.use_tpu, classification=(task_name=="reg"))
+        use_one_hot_embeddings=FLAGS.use_tpu, classification=(task_name!="reg"))
 
     # If TPU is not available, this will fall back to normal Estimator on CPU
     # or GPU.
