@@ -624,7 +624,7 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
             loss = tf.reduce_mean(per_example_loss)
             return (loss, per_example_loss, logits, probabilities)
         else:
-            msle = tf.losses.mean_squared_error(tf.log(labels), tf.log(tf.squeeze(logits)))
+            msle = tf.losses.mean_squared_error(tf.log1p(tf.clip_by_value(labels, 1e-8, None)), tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, None)))
             loss = tf.reduce_mean(msle)
 
             return (loss, msle, logits, loss)
