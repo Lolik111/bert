@@ -468,6 +468,8 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
 
     if classification:
         label_id = label_map[example.label]
+    else:
+        label_id = example.label
 
     if ex_index < 5:
         tf.logging.info("*** Example ***")
