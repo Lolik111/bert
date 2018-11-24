@@ -703,7 +703,7 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
             else:
 
                 def metric_fn(per_example_loss, label_ids, logits):
-                    ground_truth = tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30))
+                    ground_truth = tf.log1p(tf.clip_by_value(tf.cast(label_ids, tf.float32), 1e-8, 1e+30))
                     predictions = tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30))
                     return {
                         "loss": tf.metrics.mean(per_example_loss),
