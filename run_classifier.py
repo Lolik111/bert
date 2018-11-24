@@ -389,7 +389,6 @@ class RegressionProcessor(DataProcessor):
             examples.append(
                 InputExample(guid=i, text_a=df.title.values[i], label=df.totalViews.values[i]))
 
-
         return examples
 
 
@@ -624,7 +623,8 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
             loss = tf.reduce_mean(per_example_loss)
             return (loss, per_example_loss, logits, probabilities)
         else:
-            msle = tf.losses.mean_squared_error(tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30)), tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30)))
+            msle = tf.losses.mean_squared_error(tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30)),
+                                                tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30)))
 
             return (msle, msle, logits, msle)
 
@@ -688,15 +688,22 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.EVAL:
+            if classification:
 
-            def metric_fn(per_example_loss, label_ids, logits):
-                predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
-                accuracy = tf.metrics.accuracy(label_ids, predictions)
-                loss = tf.metrics.mean(per_example_loss)
-                return {
-                    "eval_accuracy": accuracy,
-                    "eval_loss": loss,
-                }
+                def metric_fn(per_example_loss, label_ids, logits):
+                    predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
+                    accuracy = tf.metrics.accuracy(label_ids, predictions)
+                    loss = tf.metrics.mean(per_example_loss)
+                    return {
+                        "eval_accuracy": accuracy,
+                        "eval_loss": loss,
+                    }
+            else:
+
+                def metric_fn(per_example_loss, label_ids, logits):
+                    return {
+                        "loss": per_example_loss
+                    }
 
             eval_metrics = (metric_fn, [per_example_loss, label_ids, logits])
             output_spec = tf.contrib.tpu.TPUEstimatorSpec(
@@ -906,7 +913,7 @@ def main(_):
         num_train_steps=num_train_steps,
         num_warmup_steps=num_warmup_steps,
         use_tpu=FLAGS.use_tpu,
-        use_one_hot_embeddings=FLAGS.use_tpu, classification=(task_name!="reg"))
+        use_one_hot_embeddings=FLAGS.use_tpu, classification=(task_name != "reg"))
 
     # If TPU is not available, this will fall back to normal Estimator on CPU
     # or GPU.
