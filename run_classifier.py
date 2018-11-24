@@ -623,10 +623,12 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
             loss = tf.reduce_mean(per_example_loss)
             return (loss, per_example_loss, logits, probabilities)
         else:
-            msle = tf.losses.mean_squared_error(tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30)),
-                                                tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30)))
+            ground_truth = tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30))
+            predictions = tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30))
+            msle = tf.losses.mean_squared_error(ground_truth, predictions)
+            se = tf.square(ground_truth - predictions)
 
-            return (msle, msle, logits, msle)
+            return (msle, se, logits, se)
 
 
 def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
@@ -701,8 +703,11 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
             else:
 
                 def metric_fn(per_example_loss, label_ids, logits):
+                    ground_truth = tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30))
+                    predictions = tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30))
                     return {
-                        "loss": per_example_loss
+                        "loss": tf.metrics.mean(per_example_loss),
+                        "another_loss": tf.metrics.mean_squared_error(ground_truth, predictions)
                     }
 
             eval_metrics = (metric_fn, [per_example_loss, label_ids, logits])
