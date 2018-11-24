@@ -624,10 +624,10 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
             loss = tf.reduce_mean(per_example_loss)
             return (loss, per_example_loss, logits, probabilities)
         else:
-            msle = tf.losses.mean_squared_error(tf.log1p(tf.clip_by_value(labels, 1e-8, 1e+30)), tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30)))
+            msle = tf.losses.mean_squared_error(tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30)), tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30)))
             loss = tf.reduce_mean(msle)
 
-            return (loss, msle, logits, loss)
+            return (loss, tf.identity(msle), logits, loss)
 
 
 def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
