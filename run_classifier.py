@@ -631,6 +631,40 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
             return (msle, se, logits, se)
 
 
+def create_reg_model(bert_config, is_training, input_ids, input_mask, segment_ids,
+                     labels, num_labels, use_one_hot_embeddings, classification=True):
+    """Creates a classification model."""
+    model = modeling.BertModel(
+        config=bert_config,
+        is_training=is_training,
+        input_ids=input_ids,
+        input_mask=input_mask,
+        token_type_ids=segment_ids,
+        use_one_hot_embeddings=use_one_hot_embeddings)
+
+    # In the demo, we are doing a simple classification task on the entire
+    # segment.
+    #
+    # If you want to use the token-level output, use model.get_sequence_output()
+    # instead.
+    output_layer = model.get_sequence_output()
+
+    with tf.variable_scope("loss"):
+        if is_training:
+            # I.e., 0.1 dropout
+            output_layer = tf.nn.dropout(output_layer, keep_prob=0.9)
+
+        dense = tf.layers.dense(tf.layers.flatten(output_layer), 1, activation=tf.nn.relu,
+                                kernel_initializer=tf.truncated_normal_initializer(stddev=0.02))
+
+        ground_truth = tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30))
+        predictions = tf.log1p(tf.clip_by_value(tf.squeeze(dense), 1e-8, 1e+30))
+        msle = tf.losses.mean_squared_error(ground_truth, predictions)
+        se = tf.square(ground_truth - predictions)
+
+        return (msle, se, dense, se)
+
+
 def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                      num_train_steps, num_warmup_steps, use_tpu,
                      use_one_hot_embeddings, classification=True):
