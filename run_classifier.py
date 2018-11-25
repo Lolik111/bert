@@ -632,7 +632,7 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
 
 
 def create_reg_model(bert_config, is_training, input_ids, input_mask, segment_ids,
-                     labels, num_labels, use_one_hot_embeddings, classification=True):
+                     labels, num_labels, use_one_hot_embeddings):
     """Creates a classification model."""
     model = modeling.BertModel(
         config=bert_config,
@@ -683,10 +683,14 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
         label_ids = features["label_ids"]
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
-
-        (total_loss, per_example_loss, logits, probabilities) = create_model(
-            bert_config, is_training, input_ids, input_mask, segment_ids, label_ids,
-            num_labels, use_one_hot_embeddings, classification)
+        if classification:
+            (total_loss, per_example_loss, logits, probabilities) = create_model(
+                bert_config, is_training, input_ids, input_mask, segment_ids, label_ids,
+                num_labels, use_one_hot_embeddings, classification)
+        else:
+            (total_loss, per_example_loss, logits, probabilities) = create_reg_model(
+                bert_config, is_training, input_ids, input_mask, segment_ids, label_ids,
+                num_labels, use_one_hot_embeddings)
 
         tvars = tf.trainable_variables()
         initialized_variable_names = {}
