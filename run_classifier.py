@@ -580,7 +580,7 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
 
 
 def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
-                 labels, num_labels, use_one_hot_embeddings, classification=True):
+                 labels, num_labels, use_one_hot_embeddings):
     """Creates a classification model."""
     model = modeling.BertModel(
         config=bert_config,
@@ -613,61 +613,20 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
 
         logits = tf.matmul(output_layer, output_weights, transpose_b=True)
         logits = tf.nn.bias_add(logits, output_bias)
-        if classification:
-            probabilities = tf.nn.softmax(logits, axis=-1)
-            log_probs = tf.nn.log_softmax(logits, axis=-1)
 
-            one_hot_labels = tf.one_hot(labels, depth=num_labels, dtype=tf.float32)
+        probabilities = tf.nn.softmax(logits, axis=-1)
+        log_probs = tf.nn.log_softmax(logits, axis=-1)
 
-            per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
-            loss = tf.reduce_mean(per_example_loss)
-            return (loss, per_example_loss, logits, probabilities)
-        else:
-            ground_truth = tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30))
-            predictions = tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30))
-            msle = tf.losses.mean_squared_error(ground_truth, predictions)
-            se = tf.square(ground_truth - predictions)
+        one_hot_labels = tf.one_hot(labels, depth=num_labels, dtype=tf.float32)
 
-            return (msle, se, logits, se)
-
-
-def create_reg_model(bert_config, is_training, input_ids, input_mask, segment_ids,
-                     labels, num_labels, use_one_hot_embeddings):
-    """Creates a classification model."""
-    model = modeling.BertModel(
-        config=bert_config,
-        is_training=is_training,
-        input_ids=input_ids,
-        input_mask=input_mask,
-        token_type_ids=segment_ids,
-        use_one_hot_embeddings=use_one_hot_embeddings)
-
-    # In the demo, we are doing a simple classification task on the entire
-    # segment.
-    #
-    # If you want to use the token-level output, use model.get_sequence_output()
-    # instead.
-    output_layer = model.get_sequence_output()
-
-    with tf.variable_scope("loss"):
-        if is_training:
-            # I.e., 0.1 dropout
-            output_layer = tf.nn.dropout(output_layer, keep_prob=0.9)
-
-        dense = tf.layers.dense(tf.layers.flatten(output_layer), 1, activation=tf.nn.relu,
-                                kernel_initializer=tf.truncated_normal_initializer(stddev=0.02))
-
-        ground_truth = tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30))
-        predictions = tf.log1p(tf.clip_by_value(tf.squeeze(dense), 1e-8, 1e+30))
-        msle = tf.losses.mean_squared_error(ground_truth, predictions)
-        se = tf.square(ground_truth - predictions)
-
-        return (msle, se, dense, se)
+        per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
+        loss = tf.reduce_mean(per_example_loss)
+        return (loss, per_example_loss, logits, probabilities)
 
 
 def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                      num_train_steps, num_warmup_steps, use_tpu,
-                     use_one_hot_embeddings, classification=True):
+                     use_one_hot_embeddings):
     """Returns `model_fn` closure for TPUEstimator."""
 
     def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
@@ -683,14 +642,9 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
         label_ids = features["label_ids"]
 
         is_training = (mode == tf.estimator.ModeKeys.TRAIN)
-        if classification:
-            (total_loss, per_example_loss, logits, probabilities) = create_model(
-                bert_config, is_training, input_ids, input_mask, segment_ids, label_ids,
-                num_labels, use_one_hot_embeddings, classification)
-        else:
-            (total_loss, per_example_loss, logits, probabilities) = create_reg_model(
-                bert_config, is_training, input_ids, input_mask, segment_ids, label_ids,
-                num_labels, use_one_hot_embeddings)
+        (total_loss, per_example_loss, logits, probabilities) = create_model(
+            bert_config, is_training, input_ids, input_mask, segment_ids, label_ids,
+            num_labels, use_one_hot_embeddings)
 
         tvars = tf.trainable_variables()
         initialized_variable_names = {}
@@ -728,25 +682,14 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 train_op=train_op,
                 scaffold_fn=scaffold_fn)
         elif mode == tf.estimator.ModeKeys.EVAL:
-            if classification:
-
-                def metric_fn(per_example_loss, label_ids, logits):
-                    predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
-                    accuracy = tf.metrics.accuracy(label_ids, predictions)
-                    loss = tf.metrics.mean(per_example_loss)
-                    return {
-                        "eval_accuracy": accuracy,
-                        "eval_loss": loss,
-                    }
-            else:
-
-                def metric_fn(per_example_loss, label_ids, logits):
-                    ground_truth = tf.log1p(tf.clip_by_value(tf.cast(label_ids, tf.float32), 1e-8, 1e+30))
-                    predictions = tf.log1p(tf.clip_by_value(tf.squeeze(logits), 1e-8, 1e+30))
-                    return {
-                        "eval_loss": tf.metrics.mean(per_example_loss),
-                        "another_loss": tf.metrics.mean_squared_error(ground_truth, predictions)
-                    }
+            def metric_fn(per_example_loss, label_ids, logits):
+                predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
+                accuracy = tf.metrics.accuracy(label_ids, predictions)
+                loss = tf.metrics.mean(per_example_loss)
+                return {
+                    "eval_accuracy": accuracy,
+                    "eval_loss": loss,
+                }
 
             eval_metrics = (metric_fn, [per_example_loss, label_ids, logits])
             output_spec = tf.contrib.tpu.TPUEstimatorSpec(
@@ -804,58 +747,6 @@ def input_fn_builder(features, seq_length, is_training, drop_remainder):
                     dtype=tf.int32),
             "label_ids":
                 tf.constant(all_label_ids, shape=[num_examples], dtype=tf.int32),
-        })
-
-        if is_training:
-            d = d.repeat()
-            d = d.shuffle(buffer_size=100)
-
-        d = d.batch(batch_size=batch_size, drop_remainder=drop_remainder)
-        return d
-
-    return input_fn
-
-
-def input_reg_fn_builder(features, seq_length, is_training, drop_remainder):
-    """Creates an `input_fn` closure to be passed to TPUEstimator."""
-
-    all_input_ids = []
-    all_input_mask = []
-    all_segment_ids = []
-    all_label_ids = []
-
-    for feature in features:
-        all_input_ids.append(feature.input_ids)
-        all_input_mask.append(feature.input_mask)
-        all_segment_ids.append(feature.segment_ids)
-        all_label_ids.append(feature.label_id)
-
-    def input_fn(params):
-        """The actual input function."""
-        batch_size = params["batch_size"]
-
-        num_examples = len(features)
-
-        # This is for demo purposes and does NOT scale to large data sets. We do
-        # not use Dataset.from_generator() because that uses tf.py_func which is
-        # not TPU compatible. The right way to load data is with TFRecordReader.
-        d = tf.data.Dataset.from_tensor_slices({
-            "input_ids":
-                tf.constant(
-                    all_input_ids, shape=[num_examples, seq_length],
-                    dtype=tf.int32),
-            "input_mask":
-                tf.constant(
-                    all_input_mask,
-                    shape=[num_examples, seq_length],
-                    dtype=tf.int32),
-            "segment_ids":
-                tf.constant(
-                    all_segment_ids,
-                    shape=[num_examples, seq_length],
-                    dtype=tf.int32),
-            "label_ids":
-                tf.constant(all_label_ids, shape=[num_examples], dtype=tf.float32),
         })
 
         if is_training:
