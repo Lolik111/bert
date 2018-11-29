@@ -621,10 +621,6 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
 
         per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
         loss = tf.reduce_mean(per_example_loss)
-        print(type(output_layer))
-        print(type(probabilities))
-        print(output_layer)
-        print(probabilities)
         return (loss, per_example_loss, logits, output_layer)
 
 
@@ -948,7 +944,6 @@ def main(_):
             for prediction in result:
                 output_line = "\t".join(
                     str(class_probability) for class_probability in prediction) + "\n"
-                # print(output_line)
                 writer.write(output_line)
 
 

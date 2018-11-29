@@ -132,6 +132,8 @@ class ModelFactory(object):
                     se = tf.sqrt(se)
 
                 if head_type == "raw":
+                    print(output_layer.shape)
+                    print(type(output_layer))
                     return (msle, se, dense, output_layer)
 
                 return (msle, se, dense, predictions)
@@ -231,6 +233,9 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 "shape": probabilities.shape,
                 "result": probabilities
             }
+            print(probabilities.shape)
+            print(type(probabilities))
+
             output_spec = tf.contrib.tpu.TPUEstimatorSpec(
                 mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
         return output_spec
