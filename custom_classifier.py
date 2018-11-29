@@ -230,7 +230,6 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 scaffold_fn=scaffold_fn)
         else:
             predictions = {
-                "shape": probabilities.shape,
                 "result": probabilities
             }
             print(probabilities.shape)
