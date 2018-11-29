@@ -621,7 +621,11 @@ def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
 
         per_example_loss = -tf.reduce_sum(one_hot_labels * log_probs, axis=-1)
         loss = tf.reduce_mean(per_example_loss)
-        return (loss, per_example_loss, logits, probabilities)
+        print(type(output_layer))
+        print(type(probabilities))
+        print(output_layer)
+        print(probabilities)
+        return (loss, per_example_loss, logits, output_layer)
 
 
 def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
@@ -698,8 +702,12 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 eval_metrics=eval_metrics,
                 scaffold_fn=scaffold_fn)
         else:
+            predictions = {
+                "shape": probabilities.shape,
+                "result": probabilities
+            }
             output_spec = tf.contrib.tpu.TPUEstimatorSpec(
-                mode=mode, predictions=probabilities, scaffold_fn=scaffold_fn)
+                mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
         return output_spec
 
     return model_fn
@@ -847,7 +855,7 @@ def main(_):
         num_train_steps=num_train_steps,
         num_warmup_steps=num_warmup_steps,
         use_tpu=FLAGS.use_tpu,
-        use_one_hot_embeddings=FLAGS.use_tpu, classification=(task_name != "reg"))
+        use_one_hot_embeddings=FLAGS.use_tpu)
 
     # If TPU is not available, this will fall back to normal Estimator on CPU
     # or GPU.
@@ -940,6 +948,7 @@ def main(_):
             for prediction in result:
                 output_line = "\t".join(
                     str(class_probability) for class_probability in prediction) + "\n"
+                # print(output_line)
                 writer.write(output_line)
 
 
