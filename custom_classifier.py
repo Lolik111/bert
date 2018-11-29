@@ -121,8 +121,6 @@ class ModelFactory(object):
                     dense = tf.layers.dense(global_avg_pool, 1, activation=lla,
                                             kernel_initializer=tf.truncated_normal_initializer(stddev=0.02))
                     dense = tf.squeeze(dense)
-                elif head_type == "raw":
-                    pass
 
                 ground_truth = tf.log1p(tf.clip_by_value(tf.cast(labels, tf.float32), 1e-8, 1e+30))
                 predictions = tf.log1p(tf.clip_by_value(dense, 1e-8, 1e+30))
