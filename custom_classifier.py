@@ -51,9 +51,10 @@ class RegressionProcessor(DataProcessor):
 
 
 class ModelFunction(object):
-    def __init__(self, func, task_type):
+    def __init__(self, func, task_type, freeze=False):
         self.create = func
         self.task_type = task_type
+        self.freeze=freeze
 
 
 class TaskType(object):
@@ -191,7 +192,8 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
         if mode == tf.estimator.ModeKeys.TRAIN:
 
             train_op = optimization.create_optimizer(
-                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
+                total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu,
+            scope=("loss" if model_function.freeze else None))
 
             output_spec = tf.contrib.tpu.TPUEstimatorSpec(
                 mode=mode,
