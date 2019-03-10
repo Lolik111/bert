@@ -347,7 +347,7 @@ def parquet_read_examples(input_file, columns=("objectId", "text")):
     for unique_id, text in df.values:
         preprocessed_line = tokenization.convert_to_unicode(text)
         preprocessed_line = preprocessed_line.strip()
-        examples.append(InputExample(unique_id=unique_id, text_a=text))
+        examples.append(InputExample(unique_id=unique_id, text_a=text, text_b=None))
     return examples
 
 
